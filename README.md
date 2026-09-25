@@ -3,8 +3,8 @@
 Auto-login + auto-klik tombol absen **biru** di `akademik.polban.ac.id/ajar/absen`, dengan log sukses/gagal yang jelas. Berjalan **lokal dengan IP asli** — bukan VPS.
 
 ---
-**© 2026 Haikal. All rights reserved.** Lihat [LICENSE](LICENSE).
 
+**© 2026 Haikal. All rights reserved.** Lihat [LICENSE](LICENSE).
 
 ## Struktur (setiap folder MANDIRI / self-contained)
 
@@ -35,6 +35,7 @@ polban-auto-absen/
 > **Catatan:** `windows/auto_absen.py` dan `termux/auto_absen.py` adalah **salinan engine yang sama**. Kalau mengubah logika engine, ubah **keduanya** agar tetap sinkron (atau jadikan satu sumber lalu salin saat rilis).
 
 ## Fitur
+
 - ✅ **Auto-login** — isi NIM + password, submit.
 - ✅ **Bypass popup "Kuesioner Layanan"** — tidak perlu klik OK.
 - ✅ **Auto ke `/ajar/absen`** — setelah login langsung ke halaman absen.
@@ -80,41 +81,46 @@ bash termux-run.sh                          # loop 24/7
 ## Cara membaca log
 
 ### Extension (panel di pojok kanan bawah situs)
-| Log | Arti |
-|---|---|
-| `✅LOGIN Berhasil` | login sukses |
-| `❌LOGIN Gagal` | NIM/password salah |
-| `⚠️DIALOG alert/confirm di-bypass` | popup dibungkam otomatis |
-| `ℹ️NAV Dari /Mhs → /ajar/absen` | pindah ke halaman absen |
-| `ℹ️SCAN #1: N tombol — biru:x hijau:y ...` | hasil scan warna |
-| `✅SCAN Sudah absen (hijau), skip` | matkul sudah absen |
-| `⚠️SCAN Skip tombol orange: ... dosen belum membuka sesi` | alasan skip |
-| `⚠️SCAN Skip tombol merah: ... di luar jadwal/waktu absensi` | alasan skip |
-| `ℹ️KLIK Klik (biru) + retry sampai hijau: NamaMatkul` | mulai klik |
-| `⚠️VERIFIKASI Percobaan 1/5: masih biru, tekan lagi...` | belum hijau, diulang |
-| `✅VERIFIKASI SUCCESS — tombol jadi HIJAU (percobaan N)` | **absen berhasil** |
-| `❌VERIFIKASI GAGAL — tidak jadi hijau setelah N percobaan` | **absen gagal** |
+
+| Log                                                          | Arti                     |
+| ------------------------------------------------------------ | ------------------------ |
+| `✅LOGIN Berhasil`                                           | login sukses             |
+| `❌LOGIN Gagal`                                              | NIM/password salah       |
+| `⚠️DIALOG alert/confirm di-bypass`                           | popup dibungkam otomatis |
+| `ℹ️NAV Dari /Mhs → /ajar/absen`                              | pindah ke halaman absen  |
+| `ℹ️SCAN #1: N tombol — biru:x hijau:y ...`                   | hasil scan warna         |
+| `✅SCAN Sudah absen (hijau), skip`                           | matkul sudah absen       |
+| `⚠️SCAN Skip tombol orange: ... dosen belum membuka sesi`    | alasan skip              |
+| `⚠️SCAN Skip tombol merah: ... di luar jadwal/waktu absensi` | alasan skip              |
+| `ℹ️KLIK Klik (biru) + retry sampai hijau: NamaMatkul`        | mulai klik               |
+| `⚠️VERIFIKASI Percobaan 1/5: masih biru, tekan lagi...`      | belum hijau, diulang     |
+| `✅VERIFIKASI SUCCESS — tombol jadi HIJAU (percobaan N)`     | **absen berhasil**       |
+| `❌VERIFIKASI GAGAL — tidak jadi hijau setelah N percobaan`  | **absen gagal**          |
 
 ### Engine (Windows `.bat` / Termux) — kode status terstruktur
-| Log | Arti |
-|---|---|
-| `ℹ️ [SCAN] 2 biru siap-klik \| hijau:1 orange:1 merah:1` | ringkasan scan per warna |
-| `⏭️ [SKIP] (orange) belum bisa diklik — dosen belum membuka sesi — Matkul` | skip + alasan |
-| `⏭️ [SKIP] (green) sudah absen (dihitung berhasil) — Matkul` | sudah absen |
-| `ℹ️ [ABSEN] target: NamaMatkul` | mulai proses absen |
-| `⚠️ [RETRY] percobaan 1/5 masih biru, tekan lagi` | belum berhasil, diulang |
-| `✅ [ABSEN] BERHASIL (percobaan N): NamaMatkul` | **absen berhasil** |
-| `❌ [ABSEN] GAGAL setelah N percobaan: NamaMatkul. Kemungkinan...` | **absen gagal** + sebab |
-| `⚠️ [SESSION] Sesi habis — re-login...` | sesi berakhir, auto re-login |
-| `❌ [ERROR] request gagal...` | error jaringan/request |
+
+| Log                                                                        | Arti                         |
+| -------------------------------------------------------------------------- | ---------------------------- |
+| `ℹ️ [SCAN] 2 biru siap-klik \| hijau:1 orange:1 merah:1`                   | ringkasan scan per warna     |
+| `⏭️ [SKIP] (orange) belum bisa diklik — dosen belum membuka sesi — Matkul` | skip + alasan                |
+| `⏭️ [SKIP] (green) sudah absen (dihitung berhasil) — Matkul`               | sudah absen                  |
+| `ℹ️ [ABSEN] target: NamaMatkul`                                            | mulai proses absen           |
+| `⚠️ [RETRY] percobaan 1/5 masih biru, tekan lagi`                          | belum berhasil, diulang      |
+| `✅ [ABSEN] BERHASIL (percobaan N): NamaMatkul`                            | **absen berhasil**           |
+| `❌ [ABSEN] GAGAL setelah N percobaan: NamaMatkul. Kemungkinan...`         | **absen gagal** + sebab      |
+| `⚠️ [SESSION] Sesi habis — re-login...`                                    | sesi berakhir, auto re-login |
+| `❌ [ERROR] request gagal...`                                              | error jaringan/request       |
 
 ### Mode diagnostik `--dump` (engine)
+
 Kalau tombol biru tidak terdeteksi, dump HTML halaman absen untuk dianalisis:
+
 ```bash
 python auto_absen.py --engine http --dump        # simpan ke absen-dump.html
 ```
+
 File berisi HTML mentah (jangan di-commit — sudah di-`.gitignore`). Kirim strukturnya untuk penyesuaian selector.
 
 ## Keamanan
+
 - Kredensial disimpan **lokal** (`chrome.storage` untuk extension; `.env` untuk engine). Tidak dikirim ke server selain `akademik.polban.ac.id`.
-- `.env`, `.clicked.json`, `windows/python/` sudah di-`.gitignore` — **jangan commit kredensial**.
