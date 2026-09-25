@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Polban Auto Absen</title>
+<style>
+  body{font:14px/1.5 sans-serif;width:300px;padding:16px;background:#0d1117;color:#e6edf3;margin:0}
+  h1{font-size:15px;margin:0 0 4px;color:#58a6ff;text-align:center}
+  .sub{font-size:11px;color:#8b949e;text-align:center;margin-bottom:14px}
+  #start{width:100%;padding:12px;background:#238636;color:#fff;border:0;border-radius:8px;
+         font-size:15px;font-weight:700;cursor:pointer}
+  #start:hover{background:#2ea043}
+  #start:disabled{background:#30363d;cursor:not-allowed}
+  .cred{margin-top:12px;font-size:11px;color:#8b949e;text-align:center}
+  .cred a{color:#58a6ff;cursor:pointer;text-decoration:underline}
+  .warn{margin-top:10px;padding:8px;background:#3d2f1f;border:1px solid #d29922;border-radius:6px;
+        font-size:11px;color:#d29922;display:none}
+  .flow{margin-top:12px;font-size:10px;color:#6e7681;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>🎓 Polban Auto Absen</h1>
+  <div class="sub">Login → bypass alert → /ajar/absen → klik semua tombol</div>
+
+  <button id="start">▶ &nbsp;Mulai Absen</button>
+
+  <div class="warn" id="warn">⚠️ NIM/password belum diisi. Klik "Pengaturan" dulu.</div>
+
+  <div class="cred">
+    NIM: <span id="nim">—</span> &nbsp;·&nbsp; <a id="open-options">⚙️ Pengaturan</a>
+  </div>
+
+  <div class="flow">
+    Klik "Mulai Absen" → popup tertutup otomatis →<br>
+    tab akademik terbuka → login → ke halaman absen →<br>
+    klik semua tombol → log muncul di pojok kanan bawah situs.
+  </div>
+
+<script src="popup.js"></script>
+</body>
+</html>

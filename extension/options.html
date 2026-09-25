@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Pengaturan Auto Absen</title>
+<style>
+  body{font:14px/1.5 sans-serif;width:340px;padding:16px;background:#f4f6f9;color:#222}
+  h1{font-size:16px;margin:0 0 12px;color:#3c8dbc}
+  label{display:block;margin-top:10px;font-weight:600;font-size:12px}
+  input[type=text],input[type=password],input[type=url],input[type=number]{width:100%;padding:7px;border:1px solid #c4ccd6;border-radius:5px;box-sizing:border-box}
+  .row{display:flex;gap:10px}
+  .row>div{flex:1}
+  .chk{display:flex;align-items:center;gap:6px;margin-top:8px}
+  button{margin-top:14px;width:100%;padding:9px;background:#3c8dbc;color:#fff;border:0;border-radius:6px;font-weight:700;cursor:pointer}
+  button:hover{background:#33739e}
+  .note{margin-top:10px;font-size:11px;color:#777}
+  .saved{margin-top:8px;color:#1a9c6b;font-weight:700;display:none}
+</style>
+</head>
+<body>
+<h1>⚙️ Polban Auto Absen</h1>
+
+<label>NIM (username)</label>
+<input type="text" id="username" placeholder="25......">
+
+<label>Password</label>
+<input type="password" id="password" placeholder="********">
+
+<label>URL halaman absen</label>
+<input type="url" id="targetUrl" value="https://akademik.polban.ac.id/ajar/absen">
+
+<div class="chk"><input type="checkbox" id="autoLogin" checked><span>Auto-isi & submit form login</span></div>
+<div class="chk"><input type="checkbox" id="autoNav" checked><span>Auto-navigate ke halaman absen</span></div>
+<div class="chk"><input type="checkbox" id="autoClick" checked><span>Auto-klik tombol absen <b style="color:#3c8dbc">BIRU</b></span></div>
+
+<div class="row">
+  <div><label>Delay min (ms)</label><input type="number" id="delayMin" value="1200"></div>
+  <div><label>Delay max (ms)</label><input type="number" id="delayMax" value="2600"></div>
+</div>
+<div class="row">
+  <div><label>Poll (ms)</label><input type="number" id="pollMs" value="15000"></div>
+  <div><label>Max passes</label><input type="number" id="maxPasses" value="40"></div>
+</div>
+<div class="row">
+  <div><label>Max retry klik</label><input type="number" id="maxRetry" value="5"></div>
+  <div><label>Jeda retry (ms)</label><input type="number" id="retryWaitMs" value="2500"></div>
+</div>
+
+<button id="save">💾 Simpan</button>
+<div class="saved" id="saved">✅ Tersimpan. Reload tab akademik.</div>
+<div class="note">Biru=belum absen (diklik) · Hijau=sudah · Orange=dosen belum buka · Merah=bukan waktu. Kredensial disimpan lokal di browser (chrome.storage.sync), tidak dikirim kemana-mana.</div>
+
+<script src="options.js"></script>
+</body>
+</html>

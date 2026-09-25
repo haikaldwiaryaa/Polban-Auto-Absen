@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Polban Auto Absen",
+  "version": "1.3.0",
+  "description": "Klik 'Mulai Absen' -> buka akademik.polban.ac.id, auto login, bypass popup, paksa ke /ajar/absen, klik semua tombol absen non-hijau. Log lengkap.",
+  "permissions": ["storage", "tabs", "webNavigation"],
+  "host_permissions": [
+    "https://akademik.polban.ac.id/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://akademik.polban.ac.id/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Polban Auto Absen",
+    "default_popup": "popup.html"
+  },
+  "icons": {}
+}
