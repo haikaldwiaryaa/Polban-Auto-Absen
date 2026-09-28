@@ -25,6 +25,10 @@ from bs4 import BeautifulSoup  # noqa: F401  (dipakai untuk parse HTML)
 BASE = "https://akademik.polban.ac.id"
 STATE_FILE = Path(__file__).resolve().parent / ".clicked.json"
 
+# Timeout adaptif: (connect, read). Lebih pendek agar tidak menunggu lama di
+# koneksi lambat; requests akan retry di lapisan loop.
+TIMEOUT = (10, 20)
+
 
 def _env_candidates():
     yield os.environ.get("POLBAN_ENV")
@@ -119,15 +123,17 @@ def _is_login_page(url: str, html: str) -> bool:
 
 
 def http_login(sess):
-    """Login lalu verifikasi dengan GET halaman absen (bukan cek response POST)."""
+    """Login + verifikasi. Return HTML halaman absen bila sukses, else None.
+    HTML dikembalikan supaya bisa dipakai ulang (user-info + scan pertama)
+    tanpa GET tambahan — hemat request di koneksi lambat."""
     sess.post(f"{BASE}/laman/login",
               data={"username": USERNAME, "password": PASSWORD, "submit": ""},
-              allow_redirects=True, timeout=30)
-    chk = sess.get(TARGET_URL, allow_redirects=True, timeout=30)
+              allow_redirects=True, timeout=TIMEOUT)
+    chk = sess.get(TARGET_URL, allow_redirects=True, timeout=TIMEOUT)
     ok = not _is_login_page(chk.url, chk.text)
     log("Login", f"OK (terautentikasi, {chk.url})" if ok else
                  f"GAGAL — kredensial salah/sesi tidak terbentuk (dilempar ke {chk.url})")
-    return ok
+    return chk.text if ok else None
 
 
 def _parse_user_header(teks, info):
@@ -148,12 +154,14 @@ def _parse_user_header(teks, info):
     return info
 
 
-def fetch_user_info(sess):
-    """Ambil NIM/nama/jurusan dari .user-header (engine http)."""
+def fetch_user_info(sess, html=None):
+    """Ambil NIM/nama/jurusan dari .user-header. Bila `html` diberikan, pakai itu
+    (hemat 1 GET)."""
     info = {"nim": USERNAME, "nama": "", "jurusan": ""}
     try:
-        r = sess.get(TARGET_URL, allow_redirects=True, timeout=30)
-        uh = BeautifulSoup(r.text, "html.parser").select_one(".user-header")
+        if html is None:
+            html = sess.get(TARGET_URL, allow_redirects=True, timeout=TIMEOUT).text
+        uh = BeautifulSoup(html, "html.parser").select_one(".user-header")
         if uh:
             teks = " ".join(uh.get_text(" ", strip=True).split())
             _parse_user_header(teks, info)
@@ -225,12 +233,17 @@ def _parse_row_action(row, btn):
     }
 
 
-def http_find_blue(sess):
-    """Return (actions, skips) dari tabel #jadwal. (None, None) bila sesi mati."""
-    r = sess.get(TARGET_URL, allow_redirects=True, timeout=30)
-    if _is_login_page(r.url, r.text):
+def http_find_blue(sess, html=None):
+    """Return (actions, skips) dari tabel #jadwal. (None, None) bila sesi mati.
+    Bila `html` diberikan, parse itu langsung (hemat 1 GET)."""
+    if html is None:
+        r = sess.get(TARGET_URL, allow_redirects=True, timeout=TIMEOUT)
+        if _is_login_page(r.url, r.text):
+            return None, None
+        html = r.text
+    elif _is_login_page(TARGET_URL, html):
         return None, None
-    soup = BeautifulSoup(r.text, "html.parser")
+    soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", id="jadwal") or soup.find("table")
     actions, skips = [], []
     if not table:
@@ -260,26 +273,44 @@ def http_find_blue(sess):
     return actions, skips
 
 
-def _still_blue(sess, key: str) -> bool:
-    """True bila baris `key` (nama_mk|dosen) masih biru. Cocok by konten, bukan index."""
-    acts, _ = http_find_blue(sess)
+def _still_blue(sess, key: str, html=None) -> bool:
+    """True bila baris `key` (nama_mk|dosen) masih biru. Cocok by konten, bukan index.
+    Bila `html` diberikan, parse itu (hemat 1 GET)."""
+    acts, _ = http_find_blue(sess, html=html)
     if acts is None:
         return False
     return any(a.get("key") == key or a["sig"].startswith(key) for a in acts)
+
+
+def _response_indicates_success(resp) -> bool:
+    """Heuristik ringan: response POST absen dianggap sukses bila status 2xx dan
+    body TIDAK mengandung penanda gagal. Menghindari GET ulang tiap retry."""
+    try:
+        if resp is None or not (200 <= resp.status_code < 300):
+            return False
+        body = (resp.text or "").lower()
+        # Penanda kegagalan umum dari AJAX CodeIgniter
+        for bad in ("gagal", "error", "tidak bisa", "bukan waktu", "sudah absen",
+                    "belum dibuka", "invalid", "false"):
+            if bad in body:
+                return False
+        return True
+    except Exception:
+        return False
 
 
 def _do_request(sess, a):
     if a["kind"] == "ajax":
         headers = {"X-Requested-With": "XMLHttpRequest",
                    "Referer": TARGET_URL, "Origin": BASE}
-        return sess.post(a["url"], data=a["data"], headers=headers, timeout=30)
+        return sess.post(a["url"], data=a["data"], headers=headers, timeout=TIMEOUT)
     if a["kind"] == "get":
-        return sess.get(a["url"], timeout=30)
-    return sess.post(a["url"], data=a["data"], timeout=30)
+        return sess.get(a["url"], timeout=TIMEOUT)
+    return sess.post(a["url"], data=a["data"], timeout=TIMEOUT)
 
 
-def http_run_once(sess, clicked: set):
-    actions, skips = http_find_blue(sess)
+def http_run_once(sess, clicked: set, html=None):
+    actions, skips = http_find_blue(sess, html=html)
     if actions is None:
         log_warn("SESSION", "Sesi habis — re-login...")
         if not http_login(sess):
@@ -312,13 +343,22 @@ def http_run_once(sess, clicked: set):
         for attempt in range(1, MAX_RETRY + 1):
             jitter()
             try:
-                _do_request(sess, a)
+                resp = _do_request(sess, a)
             except Exception as e:
                 log_fail("ERROR", f"request gagal (percobaan {attempt}): {e} — {sig[:50]}")
                 continue
             time.sleep(RETRY_WAIT)
-            if not _still_blue(sess, a.get("key", sig)):
+            # Deteksi sukses cepat dari response POST (tanpa GET ulang).
+            # Hanya 1 GET konfirmasi bila response ambigu (tidak jelas sukses/gagal).
+            if _response_indicates_success(resp):
                 log_ok("ABSEN", f"BERHASIL (percobaan {attempt}): {sig[:55]}")
+                clicked.add(sig)
+                save_state(clicked)
+                done = True
+                break
+            # Response ambigu/gagal -> konfirmasi 1x GET apakah tombol masih biru.
+            if not _still_blue(sess, a.get("key", sig)):
+                log_ok("ABSEN", f"BERHASIL (percobaan {attempt}, dikonfirmasi): {sig[:55]}")
                 clicked.add(sig)
                 save_state(clicked)
                 done = True
@@ -332,15 +372,23 @@ def http_run_once(sess, clicked: set):
 
 def engine_http(loop: bool):
     sess = requests.Session()
-    sess.headers.update({"User-Agent": UA, "Referer": BASE + "/"})
-    if not http_login(sess):
+    sess.headers.update({
+        "User-Agent": UA, "Referer": BASE + "/",
+        "Accept-Encoding": "gzip, deflate",   # kompresi -> lebih kecil di koneksi lambat
+        "Connection": "keep-alive",           # reuse TCP -> hemat handshake
+    })
+    html = http_login(sess)          # login + ambil HTML absen sekaligus
+    if html is None:
         sys.exit(2)
-    print_header(fetch_user_info(sess))
+    # Pakai HTML yang sama untuk banner & scan pertama — hemat 2 GET.
+    print_header(fetch_user_info(sess, html=html))
     clicked = load_state()
     log(f"Engine HTTP aktif. interval={INTERVAL}s loop={loop}")
+    first = True
     while True:
         try:
-            http_run_once(sess, clicked)
+            http_run_once(sess, clicked, html=html if first else None)
+            first = False
         except Exception as e:
             log_fail("ERROR", f"siklus: {e}")
         if not loop:
@@ -462,7 +510,7 @@ def dump_absen_html(path: str = None):
     if not http_login(sess):
         print("Login GAGAL — cek NIM/password.", file=sys.stderr)
         sys.exit(2)
-    r = sess.get(TARGET_URL, allow_redirects=True, timeout=30)
+    r = sess.get(TARGET_URL, allow_redirects=True, timeout=TIMEOUT)
     Path(out).write_text(r.text, encoding="utf-8")
     log(f"HTML halaman absen disimpan ke: {out}")
 
