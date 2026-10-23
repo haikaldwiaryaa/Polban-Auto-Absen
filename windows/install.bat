@@ -33,8 +33,10 @@ if not exist "%PYDIR%\Scripts\pip.exe" (
   "%PYDIR%\python.exe" "%PYDIR%\get-pip.py" --no-warn-script-location || goto dl_fail
 )
 
-echo [4/5] Install dependensi (requests, beautifulsoup4)...
-"%PYDIR%\python.exe" -m pip install --quiet --no-warn-script-location requests beautifulsoup4 || goto dl_fail
+echo [4/5] Install dependensi (requests, beautifulsoup4, rich)...
+REM rich dipakai untuk live TUI dashboard (tui.py). Kalau gagal diinstall,
+REM engine tetap jalan dalam mode plain text.
+"%PYDIR%\python.exe" -m pip install --quiet --no-warn-script-location requests beautifulsoup4 rich || goto dl_fail
 
 echo [5/5] Siapkan config...
 if not exist "%~dp0.env" (

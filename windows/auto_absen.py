@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Haikal. All rights reserved.
-# Polban Auto Absen — engine HTTP/Playwright (dipakai windows/*.bat & termux/*.sh)
+# Polban Auto Absen -- engine HTTP/Playwright (dipakai windows/*.bat & termux/*.sh)
 """Auto-login + auto-klik tombol absen biru di akademik.polban.ac.id/ajar/absen.
 
 Engine:
   http  requests + BeautifulSoup (ringan, default)
   pw    Playwright (fallback bila halaman pakai ajax berat)
+
+Output:
+  Semua status & log tampil di live TUI dashboard (lihat tui.py) -- sama seperti
+  versi Linux. Jatuh ke mode plain text otomatis bila rich tidak terpasang,
+  terminal non-interaktif, atau dijalankan dengan --once / --plain.
 """
 
 import argparse
@@ -21,6 +26,21 @@ from urllib.parse import urljoin
 
 import requests  # noqa: F401  (dipakai di engine http & dump)
 from bs4 import BeautifulSoup  # noqa: F401  (dipakai untuk parse HTML)
+
+# Python embedded (windows/python) memakai file python311._pth yang menyalakan
+# isolated mode: folder SKRIP tidak otomatis masuk sys.path -- titik '.' di _pth
+# menunjuk ke folder python.exe, bukan ke folder auto_absen.py. Tanpa baris ini
+# `import tui` gagal walau tui.py ada di sebelahnya.
+_HERE = str(Path(__file__).resolve().parent)
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+try:
+    from tui import create_dashboard, Dashboard
+except ImportError as _e:  # tui.py benar-benar tidak ada
+    print(f"ERROR: modul UI dashboard tidak bisa dimuat: {_e}")
+    print(f"       Pastikan tui.py ada di: {_HERE}")
+    raise SystemExit(1)
 
 BASE = "https://akademik.polban.ac.id"
 STATE_FILE = Path(__file__).resolve().parent / ".clicked.json"
@@ -73,22 +93,38 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
 
-def log(*a):
-    print(f"[{time.strftime('%H:%M:%S')}] [AutoAbsen]", *a, flush=True)
+# ---------------------------------------------------------------
+# TUI instance (global, di-set di main) + helper log
+# ---------------------------------------------------------------
+tui: Dashboard = None  # type: ignore
 
 
-def _emit(icon, code, msg):
-    log(f"{icon} [{code}] {msg}")
+def _emit(code, msg, level="info"):
+    """Kirim satu baris ke activity log TUI. Sebelum TUI hidup (validasi .env,
+    mode --dump) jatuh ke print biasa."""
+    if tui is None:
+        print(f"[{time.strftime('%H:%M:%S')}] [{code}] {msg}", flush=True)
+    else:
+        tui.push_event(code, msg, level=level)
 
-def log_ok(code, msg):      _emit("✅", code, msg)
-def log_fail(code, msg):    _emit("❌", code, msg)
-def log_warn(code, msg):    _emit("⚠️ ", code, msg)
-def log_info(code, msg):    _emit("ℹ️ ", code, msg)
-def log_skip(color, reason, sig):  _emit("⏭️ ", "SKIP", f"({color}) {reason} — {sig[:60]}")
+
+def log(code, msg):        _emit(code, msg, "info")
+def log_ok(code, msg):     _emit(code, msg, "ok")
+def log_fail(code, msg):   _emit(code, msg, "fail")
+def log_warn(code, msg):   _emit(code, msg, "warn")
+def log_info(code, msg):   _emit(code, msg, "info")
 
 
 def jitter(a=DELAY_MIN, b=DELAY_MAX):
     time.sleep(random.uniform(a, b))
+
+
+def countdown_sleep(seconds: int):
+    """Sleep dengan countdown yang di-update di TUI tiap detik."""
+    for remaining in range(seconds, 0, -1):
+        tui.set_countdown(remaining)
+        time.sleep(1)
+    tui.set_countdown(0)
 
 
 def load_state():
@@ -125,14 +161,20 @@ def _is_login_page(url: str, html: str) -> bool:
 def http_login(sess):
     """Login + verifikasi. Return HTML halaman absen bila sukses, else None.
     HTML dikembalikan supaya bisa dipakai ulang (user-info + scan pertama)
-    tanpa GET tambahan — hemat request di koneksi lambat."""
+    tanpa GET tambahan -- hemat request di koneksi lambat."""
     sess.post(f"{BASE}/laman/login",
               data={"username": USERNAME, "password": PASSWORD, "submit": ""},
               allow_redirects=True, timeout=TIMEOUT)
     chk = sess.get(TARGET_URL, allow_redirects=True, timeout=TIMEOUT)
     ok = not _is_login_page(chk.url, chk.text)
-    log("Login", f"OK (terautentikasi, {chk.url})" if ok else
-                 f"GAGAL — kredensial salah/sesi tidak terbentuk (dilempar ke {chk.url})")
+    if ok:
+        if tui:
+            tui.set_auth_status("OK -- Authenticated")
+        log_ok("LOGIN", "Authenticated")
+    else:
+        if tui:
+            tui.set_auth_status("GAGAL -- Kredensial salah")
+        log_fail("LOGIN", f"GAGAL -- dilempar ke {chk.url}")
     return chk.text if ok else None
 
 
@@ -170,24 +212,12 @@ def fetch_user_info(sess, html=None):
     return info
 
 
-def print_header(info):
-    garis = "=" * 56
-    log(garis)
-    log("  POLBAN AUTO ABSEN")
-    log(garis)
-    if info.get("nama"):
-        log(f"  Nama   : {info['nama']}")
-    log(f"  NIM    : {info.get('nim') or USERNAME}")
-    log(f"  Waktu  : {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    log(garis)
-
-
 def skip_reason(color: str) -> str:
     return {
         "green":  "sudah absen (dihitung berhasil)",
-        "orange": "belum bisa diklik — dosen belum membuka sesi absen",
-        "red":    "belum bisa diklik — di luar jadwal/waktu absensi",
-        "unknown": "warna tidak dikenali — dilewati demi keamanan",
+        "orange": "belum buka -- dosen belum membuka sesi absen",
+        "red":    "belum waktunya -- di luar jam absensi",
+        "unknown": "warna tidak dikenali -- dilewati demi keamanan",
     }.get(color, "tidak perlu diklik")
 
 
@@ -229,7 +259,8 @@ def _parse_row_action(row, btn):
         "sig": f"{nama_mk}|{dosen}|{jam}",
         "key": f"{nama_mk}|{dosen}",
         "kind": "ajax", "url": ABSEN_ENDPOINT, "data": data,
-        "nama_mk": nama_mk, "label": f"{nama_mk} ({jam})",
+        "nama_mk": nama_mk, "dosen": dosen, "jam": jam,
+        "label": f"{nama_mk} ({jam})",
     }
 
 
@@ -309,64 +340,85 @@ def _do_request(sess, a):
     return sess.post(a["url"], data=a["data"], timeout=TIMEOUT)
 
 
-def http_run_once(sess, clicked: set, html=None):
+def http_run_once(sess, clicked: set, html=None, first_run: bool = False):
     actions, skips = http_find_blue(sess, html=html)
     if actions is None:
-        log_warn("SESSION", "Sesi habis — re-login...")
-        if not http_login(sess):
+        log_warn("SESSION", "Sesi habis -- re-login...")
+        tui.set_auth_status("Sesi habis -- re-login...")
+        if http_login(sess) is None:
             return False
         actions, skips = http_find_blue(sess)
         actions = actions or []
         skips = skips or []
 
+    # Tabel jadwal di TUI di-update in-place (tidak dicetak ulang tiap siklus)
+    changed = tui.update_jadwal(actions, skips)
+
     counts = {}
     for color, _, _ in (skips or []):
         counts[color] = counts.get(color, 0) + 1
-    log_info("SCAN", f"{len(actions)} biru siap-klik | "
-                     f"hijau:{counts.get('green',0)} orange:{counts.get('orange',0)} "
-                     f"merah:{counts.get('red',0)} lain:{counts.get('unknown',0)}")
+    summary = (f"{len(actions)} siap absen | {counts.get('green', 0)} sudah absen | "
+               f"{counts.get('orange', 0)} belum buka | {counts.get('red', 0)} belum waktunya")
+    tui.set_last_scan(f"{time.strftime('%H:%M:%S')} ({summary})")
 
-    for color, sig, reason in (skips or []):
-        log_skip(color, reason, sig)
+    # Activity log hanya diisi saat ada yang penting -- bukan tiap siklus,
+    # supaya ring buffer tidak penuh oleh scan yang sama berulang.
+    #
+    # Rincian per matkul (sudah absen / belum buka / belum waktunya) TIDAK
+    # ditulis ke log: semuanya sudah tampil di tabel "Jadwal Hari Ini" lengkap
+    # dengan alasannya. Di mode plain (tanpa tabel) daftar itu dicetak oleh
+    # PlainDashboard.update_jadwal.
+    if first_run:
+        log_info("SCAN", f"Scan awal: {summary}")
+    elif actions:
+        log_ok("SCAN", f"Ditemukan {len(actions)} matkul siap absen!")
+    elif changed:
+        log_info("JADWAL", f"Status jadwal berubah: {summary}")
 
     if not actions:
-        log_info("SCAN", "Tidak ada tombol biru (sudah absen / dosen belum buka / di luar jadwal).")
         return True
 
     for a in actions:
         sig = a["sig"]
         if sig in clicked:
-            log_info("KLIK", f"skip (sudah diklik hari ini): {sig[:60]}")
+            # Sudah diklik di siklus sebelumnya hari ini -- status sudah terlihat
+            # di tabel, jadi tidak perlu bikin baris log tiap siklus.
             continue
-        log_info("ABSEN", f"target: {sig[:70]}")
+        log_info("ABSEN", f"target: {a.get('label', sig)[:70]}")
         done = False
         for attempt in range(1, MAX_RETRY + 1):
             jitter()
             try:
                 resp = _do_request(sess, a)
             except Exception as e:
-                log_fail("ERROR", f"request gagal (percobaan {attempt}): {e} — {sig[:50]}")
+                log_fail("ERROR", f"request gagal (percobaan {attempt}): {e} -- {sig[:40]}")
                 continue
             time.sleep(RETRY_WAIT)
             # Deteksi sukses cepat dari response POST (tanpa GET ulang).
             # Hanya 1 GET konfirmasi bila response ambigu (tidak jelas sukses/gagal).
             if _response_indicates_success(resp):
-                log_ok("ABSEN", f"BERHASIL (percobaan {attempt}): {sig[:55]}")
+                log_ok("ABSEN", f"BERHASIL (percobaan {attempt}): {a.get('nama_mk', sig)[:55]}")
+                tui.mark_result(sig, success=True, nama=a.get('nama_mk', ''))
                 clicked.add(sig)
                 save_state(clicked)
                 done = True
                 break
             # Response ambigu/gagal -> konfirmasi 1x GET apakah tombol masih biru.
             if not _still_blue(sess, a.get("key", sig)):
-                log_ok("ABSEN", f"BERHASIL (percobaan {attempt}, dikonfirmasi): {sig[:55]}")
+                log_ok("ABSEN", f"BERHASIL (percobaan {attempt}, dikonfirmasi): "
+                                f"{a.get('nama_mk', sig)[:50]}")
+                tui.mark_result(sig, success=True, nama=a.get('nama_mk', ''))
                 clicked.add(sig)
                 save_state(clicked)
                 done = True
                 break
-            log_warn("RETRY", f"percobaan {attempt}/{MAX_RETRY} masih biru, tekan lagi — {sig[:50]}")
+            log_warn("RETRY", f"percobaan {attempt}/{MAX_RETRY} masih biru, tekan lagi "
+                              f"-- {a.get('nama_mk', sig)[:45]}")
         if not done:
-            log_fail("ABSEN", f"GAGAL setelah {MAX_RETRY} percobaan: {sig[:60]}. "
-                             "Kemungkinan request ditolak server / bukan waktu absen.")
+            log_fail("ABSEN", f"GAGAL setelah {MAX_RETRY} percobaan: "
+                              f"{a.get('nama_mk', sig)[:50]}. "
+                              "Kemungkinan request ditolak server / bukan waktu absen.")
+            tui.mark_result(sig, success=False, nama=a.get('nama_mk', ''))
     return True
 
 
@@ -379,22 +431,25 @@ def engine_http(loop: bool):
     })
     html = http_login(sess)          # login + ambil HTML absen sekaligus
     if html is None:
+        tui.stop()
         sys.exit(2)
-    # Pakai HTML yang sama untuk banner & scan pertama — hemat 2 GET.
-    print_header(fetch_user_info(sess, html=html))
+    # Pakai HTML yang sama untuk identitas & scan pertama -- hemat 2 GET.
+    tui.set_user_info(fetch_user_info(sess, html=html))
+    if ENV_PATH_USED:
+        log_info("CONFIG", f"{ENV_PATH_USED} (NIM {USERNAME})")
     clicked = load_state()
-    log(f"Engine HTTP aktif. interval={INTERVAL}s loop={loop}")
+    log_info("ENGINE", f"HTTP aktif. interval={INTERVAL}s loop={loop}")
     first = True
     while True:
+        tui.increment_cycle()
         try:
-            http_run_once(sess, clicked, html=html if first else None)
-            first = False
+            http_run_once(sess, clicked, html=html if first else None, first_run=first)
         except Exception as e:
             log_fail("ERROR", f"siklus: {e}")
+        first = False
         if not loop:
             break
-        log(f"Tidur {INTERVAL}s...")
-        time.sleep(INTERVAL)
+        countdown_sleep(INTERVAL)
 
 
 # ---- Engine Playwright (fallback) ----
@@ -444,17 +499,20 @@ def pw_click_pass(page, clicked: set):
             if sig in clicked:
                 continue
             found += 1
-            log("ABSEN (pw) ->", sig[:70])
+            log_info("ABSEN", f"target (pw): {sig[:70]}")
             b.scroll_into_view_if_needed()
             jitter()
             b.click(timeout=8000)
+            log_ok("ABSEN", f"BERHASIL (pw): {sig[:55]}")
+            # Engine pw hanya punya sig 'teks_tombol|teks_baris' -- nama matkul
+            # diambil dari sig oleh TUI.
+            tui.mark_result(sig, success=True)
             clicked.add(sig)
             save_state(clicked)
             page.wait_for_timeout(random.randint(1000, 2000))
         except Exception as e:
-            log("ERROR klik pw:", e)
-    if found == 0:
-        log("Tidak ada tombol biru (sudah absen / dosen belum buka / di luar jadwal).")
+            log_fail("ERROR", f"klik pw: {e}")
+    tui.set_last_scan(f"{time.strftime('%H:%M:%S')} ({found} siap absen)")
 
 
 def pw_login(page):
@@ -464,7 +522,8 @@ def pw_login(page):
     jitter(0.4, 0.9)
     page.click('form#fm button[type="submit"]')
     page.wait_for_load_state("domcontentloaded")
-    log("Login (pw) submitted")
+    tui.set_auth_status("OK -- Authenticated")
+    log_ok("LOGIN", "Authenticated (pw)")
 
 
 def pw_fetch_user_info(page):
@@ -481,7 +540,7 @@ def pw_fetch_user_info(page):
 def engine_pw(loop: bool):
     from playwright.sync_api import sync_playwright  # type: ignore[import-not-found]
     clicked = load_state()
-    log(f"Engine Playwright aktif. interval={INTERVAL}s loop={loop}")
+    log_info("ENGINE", f"Playwright aktif. interval={INTERVAL}s loop={loop}")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         ctx = browser.new_context(user_agent=UA, locale="id-ID",
@@ -489,16 +548,16 @@ def engine_pw(loop: bool):
         page = ctx.new_page()
         page.on("dialog", lambda d: d.accept())
         pw_login(page)
-        print_header(pw_fetch_user_info(page))
+        tui.set_user_info(pw_fetch_user_info(page))
         while True:
+            tui.increment_cycle()
             try:
                 pw_click_pass(page, clicked)
             except Exception as e:
                 log_fail("ERROR", f"siklus pw: {e}")
             if not loop:
                 break
-            log(f"Tidur {INTERVAL}s...")
-            time.sleep(INTERVAL)
+            countdown_sleep(INTERVAL)
         browser.close()
 
 
@@ -507,21 +566,28 @@ def dump_absen_html(path: str = None):
     out = path or str(Path(__file__).resolve().parent / "absen-dump.html")
     sess = requests.Session()
     sess.headers.update({"User-Agent": UA, "Referer": BASE + "/"})
-    if not http_login(sess):
-        print("Login GAGAL — cek NIM/password.", file=sys.stderr)
+    if http_login(sess) is None:
+        print("Login GAGAL -- cek NIM/password.", file=sys.stderr)
         sys.exit(2)
     r = sess.get(TARGET_URL, allow_redirects=True, timeout=TIMEOUT)
     Path(out).write_text(r.text, encoding="utf-8")
-    log(f"HTML halaman absen disimpan ke: {out}")
+    print(f"HTML halaman absen disimpan ke: {out}")
 
 
 def main():
+    global tui
+
     ap = argparse.ArgumentParser(description="Polban Auto Absen (Windows .bat / Termux)")
     ap.add_argument("--engine", choices=["http", "pw"],
                     default=os.environ.get("POLBAN_ENGINE", "http"))
     ap.add_argument("--once", action="store_true", help="sekali jalan lalu exit")
     ap.add_argument("--dump", nargs="?", const="", default=None,
                     help="simpan HTML halaman absen lalu exit (diagnostik)")
+    ap.add_argument("--plain", action="store_true",
+                    help="mode plain text (tanpa live dashboard)")
+    ap.add_argument("--no-alt-screen", action="store_true",
+                    help="dashboard digambar di layar biasa (tanpa alternate "
+                         "screen) -- pakai bila terminal lama tampil kacau")
     args = ap.parse_args()
 
     if not USERNAME or not PASSWORD:
@@ -532,18 +598,35 @@ def main():
             print("  .env tidak ditemukan. Salin .env.example -> .env lalu isi.", file=sys.stderr)
         sys.exit(1)
 
-    if ENV_PATH_USED:
-        log(f"Config: {ENV_PATH_USED} (NIM {USERNAME})")
-
     if args.dump is not None:
         dump_absen_html(args.dump or None)
         return
 
-    loop = not args.once
-    if args.engine == "pw":
-        engine_pw(loop)
-    else:
-        engine_http(loop)
+    # Dashboard dipakai di semua mode. Bedanya cuma alternate screen:
+    #   loop   -> alternate screen (layar bersih seperti htop)
+    #   --once -> layar biasa, supaya dashboard TETAP terlihat setelah selesai
+    # Plain text hanya kalau diminta (--plain), rich tidak ada, atau output
+    # dialihkan ke file (create_dashboard mengecek isatty).
+    alt_screen = (not args.no_alt_screen) and (not args.once)
+    tui = create_dashboard(plain=args.plain, alt_screen=alt_screen)
+    tui.set_engine(args.engine, INTERVAL)
+    tui.start()
+
+    try:
+        loop = not args.once
+        if args.engine == "pw":
+            engine_pw(loop)
+        else:
+            engine_http(loop)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        tui.stop()
+        tui.render_summary()
+        if args.once:
+            print("[AutoAbsen] Selesai (sekali jalan).", flush=True)
+        else:
+            print("[AutoAbsen] Dihentikan. Sampai jumpa!", flush=True)
 
 
 if __name__ == "__main__":

@@ -31,17 +31,44 @@ if [ ! -f "$POLBAN_ENV" ]; then
   exit 1
 fi
 
+# Sama seperti persiapan.bat di Windows: pastikan NIM-nya memang sudah diisi,
+# bukan cuma file .env-nya yang ada.
+if ! grep -qE '^POLBAN_USERNAME=.+' "$POLBAN_ENV"; then
+  echo "[PERINGATAN] POLBAN_USERNAME di $POLBAN_ENV sepertinya masih kosong."
+  echo "             Isi dulu POLBAN_USERNAME dan POLBAN_PASSWORD:  nano \"$POLBAN_ENV\""
+  printf "             Tetap lanjut? [y/N] "
+  read -r lanjut
+  case "$lanjut" in
+    [yY]*) ;;
+    *) exit 1 ;;
+  esac
+fi
+
+# Pastikan dependensi lengkap. Dijalankan tiap kali supaya update repo yang
+# membawa dependensi baru (mis. `rich` untuk dashboard) tidak bikin gagal --
+# kalau semua sudah ada, cek ini selesai seketika tanpa akses internet.
+# CATATAN: JANGAN pernah 'pip install --upgrade pip' di Termux (merusak python-pip).
+if ! python -c 'import requests, bs4, rich' >/dev/null 2>&1; then
+  echo "[Setup] Dependensi belum lengkap -- memasang sekali saja (butuh internet)..."
+  python -m pip install --user --quiet requests beautifulsoup4 rich
+  if ! python -c 'import requests, bs4, rich' >/dev/null 2>&1; then
+    echo "[Setup] GAGAL memasang dependensi. Jalankan: bash termux-install.sh"
+    exit 1
+  fi
+  echo "[Setup] Dependensi lengkap."
+fi
+
 # Cegah CPU tidur (butuh Termux:API; abaikan kalau tidak ada)
 command -v termux-wake-lock >/dev/null 2>&1 && termux-wake-lock
 
-echo "============================================================"
-echo " Polban Auto Absen (Termux, engine HTTP) - Ctrl+C untuk berhenti"
+# Banner & status digambar oleh live dashboard (tui.py), jadi di sini cukup
+# info folder/config saja. Argumen tambahan diteruskan ke engine, misal:
+#   bash termux-run.sh --plain          (tanpa dashboard, log mengalir biasa)
+#   bash termux-run.sh --no-alt-screen  (dashboard tanpa alternate screen)
 echo " Folder : $SCRIPT_DIR"
 echo " Config : $POLBAN_ENV"
-echo "============================================================"
 while true; do
-  echo "[$(date '+%F %T')] mulai auto_absen.py"
-  python "$SCRIPT_DIR/auto_absen.py" --engine http
+  python "$SCRIPT_DIR/auto_absen.py" --engine http "$@"
   echo "[$(date '+%F %T')] berhenti, restart 10 detik..."
   sleep 10
 done

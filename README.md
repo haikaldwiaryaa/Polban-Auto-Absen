@@ -16,22 +16,25 @@ polban-auto-absen/
 │   ├── manifest.json  background.js  content.js
 │   ├── popup.html  popup.js  options.html  options.js
 │
-├── windows/            # Windows .bat (double-click, tanpa browser)
+├── windows/            # Windows .bat (double-click, live TUI dashboard)
 │   ├── auto_absen.py        # engine (mandiri)
+│   ├── tui.py               # modul TUI (rich live dashboard)
+│   ├── persiapan.bat        # cek Python + dependensi + .env (dipanggil kedua launcher)
 │   ├── install.bat          # install Python portable (sekali)
-│   ├── auto_absen.bat       # jalankan (loop)
-│   ├── absen_sekali.bat     # tes sekali
+│   ├── auto_absen.bat       # jalankan (loop, dashboard)
+│   ├── absen_sekali.bat     # tes sekali (dashboard tetap di layar)
 │   ├── .env.example  README.md
 │
 ├── linux/              # Linux (live TUI dashboard)
-│   ├── auto_absen.py        # engine + TUI integration
+│   ├── auto_absen.py        # engine + TUI integration (dirawat terpisah)
 │   ├── tui.py               # modul TUI (rich live dashboard)
 │   ├── install.sh           # installer
 │   ├── run.sh               # launcher
 │   ├── .env.example  README.md
 │
-├── termux/             # Android Termux (background 24/7)
+├── termux/             # Android Termux (24/7, live TUI dashboard)
 │   ├── auto_absen.py        # engine (mandiri)
+│   ├── tui.py               # modul TUI (rich live dashboard)
 │   ├── termux-install.sh    # installer
 │   ├── termux-run.sh        # launcher (loop + auto-restart)
 │   ├── .env.example  README.md
@@ -39,7 +42,7 @@ polban-auto-absen/
 └── README.md  CONTRIBUTING.md  LICENSE  .gitignore
 ```
 
-> **Catatan:** `windows/auto_absen.py` dan `termux/auto_absen.py` adalah **salinan engine yang sama**. `linux/auto_absen.py` berbagi engine logic yang sama tetapi output dialihkan ke live TUI dashboard via `tui.py`. Kalau mengubah logika engine, ubah **semua versi** agar tetap sinkron.
+> **Catatan:** `windows/` dan `termux/` memakai **file identik** (`auto_absen.py` + `tui.py`) — label platform di banner dideteksi otomatis saat runtime, jadi perbaikan cukup disalin apa adanya antar keduanya (`diff windows/auto_absen.py termux/auto_absen.py` harus kosong). `linux/` memegang salinannya sendiri dan **dirawat terpisah**.
 
 ## Fitur
 
@@ -48,10 +51,13 @@ polban-auto-absen/
 - ✅ **Auto ke `/ajar/absen`** — setelah login langsung ke halaman absen.
 - ✅ **Klik HANYA tombol BIRU** — warna lain tidak diklik (tidak merespon).
 - ✅ **Retry sampai hijau** — klik biru → tunggu hijau → kalau belum, tekan ulang (maks `maxRetry`, default 5).
-- ✅ **Log skip detail per matkul** — hijau=sudah absen · orange=dosen belum buka · merah=di luar jadwal.
+- ✅ **Alasan per matkul** — hijau=sudah absen · orange=dosen belum buka · merah=di luar jadwal. Di `windows/`, `termux/`, dan extension ditampilkan di tabel jadwal (tidak lagi membanjiri log); di `linux/` masih berupa baris log.
 - ✅ **Log sukses/gagal** per tahap + nama matkul + sebab gagal.
 - ✅ **Event-driven**, **anti-duplikat per-hari**, **kredensial tersimpan permanen**.
 - ✅ **Extension hanya jalan saat dipicu** — flow berjalan hanya setelah menekan **▶ Mulai Absen**.
+- ✅ **Dependensi menyusul sendiri** — `auto_absen.bat` dan `absen_sekali.bat` sama-sama memanggil `persiapan.bat` (Python portable + paket + `.env`), dan `termux-run.sh` melakukan pemeriksaan yang setara. Setelah `git pull` yang menambah dependensi, cukup jalankan seperti biasa. Untuk `linux/`, jalankan `bash install.sh` sekali setelah pull.
+- ✅ **Tampilan menyesuaikan ukuran jendela** (`windows/`, `termux/`, extension) — dashboard dibangun ulang tiap frame, jadi tabel jadwal berubah bentuk sendiri saat terminal di-maximize/di-restore: kolom Jam lalu Keterangan melipat ke bawah nama matkul, dan jumlah baris log menyesuaikan tinggi jendela. Di Windows, buffer console ikut dilebarkan otomatis saat jendela di-maximize supaya tidak menyisakan area kosong di kanan. Panel extension melar/menyusut mengikuti lebar browser.
+- ✅ **Dashboard seragam di semua platform** — identitas mahasiswa, tabel jadwal hari ini dengan status per matkul, countdown scan berikutnya, log aktivitas ringkas. Di terminal (Windows/Linux/Termux) lewat `tui.py`, di browser lewat panel `content.js`.
 
 ---
 
@@ -65,11 +71,13 @@ polban-auto-absen/
 
 ```bat
 cd windows
-install.bat          :: sekali (unduh Python portable)
+install.bat          :: sekali (unduh Python portable + rich)
 :: edit .env -> isi POLBAN_USERNAME & POLBAN_PASSWORD
-auto_absen.bat       :: jalankan (loop)
-absen_sekali.bat     :: tes sekali
+auto_absen.bat       :: jalankan (loop, live dashboard)
+absen_sekali.bat     :: tes sekali (dashboard tetap di layar)
 ```
+
+Lihat **`windows/README.md`** — termasuk argumen `--plain` dan `--no-alt-screen`.
 
 ## Linux (Live TUI Dashboard)
 
@@ -99,36 +107,57 @@ bash termux-run.sh                          # loop 24/7
 
 ## Cara membaca log
 
-### Extension (panel di pojok kanan bawah situs)
+### Extension (panel dashboard di pojok kanan bawah situs)
 
 | Log                                                          | Arti                     |
 | ------------------------------------------------------------ | ------------------------ |
-| `✅LOGIN Berhasil`                                           | login sukses             |
-| `❌LOGIN Gagal`                                              | NIM/password salah       |
-| `⚠️DIALOG alert/confirm di-bypass`                           | popup dibungkam otomatis |
-| `ℹ️NAV Dari /Mhs → /ajar/absen`                              | pindah ke halaman absen  |
-| `ℹ️SCAN #1: N tombol — biru:x hijau:y ...`                   | hasil scan warna         |
-| `✅SCAN Sudah absen (hijau), skip`                           | matkul sudah absen       |
-| `⚠️SCAN Skip tombol orange: ... dosen belum membuka sesi`    | alasan skip              |
-| `⚠️SCAN Skip tombol merah: ... di luar jadwal/waktu absensi` | alasan skip              |
-| `ℹ️KLIK Klik (biru) + retry sampai hijau: NamaMatkul`        | mulai klik               |
-| `⚠️VERIFIKASI Percobaan 1/5: masih biru, tekan lagi...`      | belum hijau, diulang     |
-| `✅VERIFIKASI SUCCESS — tombol jadi HIJAU (percobaan N)`     | **absen berhasil**       |
-| `❌VERIFIKASI GAGAL — tidak jadi hijau setelah N percobaan`  | **absen gagal**          |
+| `[OK] [LOGIN] Berhasil`                                           | login sukses             |
+| `[!!] [LOGIN] Gagal`                                              | NIM/password salah       |
+| `[??] [DIALOG] alert/confirm di-bypass`                           | popup dibungkam otomatis |
+| `[--] [NAV] Dari /Mhs ke /ajar/absen`                              | pindah ke halaman absen  |
+| `[--] [SCAN] #1: N tombol -- biru:x hijau:y ...`                   | hasil scan warna         |
+| `[--] [KLIK] Klik (biru) + retry sampai hijau: NamaMatkul`        | mulai klik               |
+| `[??] [VERIFIKASI] Percobaan 1/5: masih biru, tekan lagi...`      | belum hijau, diulang     |
+| `[OK] [VERIFIKASI] SUCCESS -- tombol jadi HIJAU (percobaan N)`     | **absen berhasil**       |
+| `[!!] [VERIFIKASI] GAGAL -- tidak jadi hijau setelah N percobaan`  | **absen gagal**          |
 
-### Engine (Windows `.bat` / Termux) — kode status terstruktur
+### Engine (Windows / Termux / Linux) — panel Log Aktivitas
 
-| Log                                                                        | Arti                         |
-| -------------------------------------------------------------------------- | ---------------------------- |
-| `ℹ️ [SCAN] 2 biru siap-klik \| hijau:1 orange:1 merah:1`                   | ringkasan scan per warna     |
-| `⏭️ [SKIP] (orange) belum bisa diklik — dosen belum membuka sesi — Matkul` | skip + alasan                |
-| `⏭️ [SKIP] (green) sudah absen (dihitung berhasil) — Matkul`               | sudah absen                  |
-| `ℹ️ [ABSEN] target: NamaMatkul`                                            | mulai proses absen           |
-| `⚠️ [RETRY] percobaan 1/5 masih biru, tekan lagi`                          | belum berhasil, diulang      |
-| `✅ [ABSEN] BERHASIL (percobaan N): NamaMatkul`                            | **absen berhasil**           |
-| `❌ [ABSEN] GAGAL setelah N percobaan: NamaMatkul. Kemungkinan...`         | **absen gagal** + sebab      |
-| `⚠️ [SESSION] Sesi habis — re-login...`                                    | sesi berakhir, auto re-login |
-| `❌ [ERROR] request gagal...`                                              | error jaringan/request       |
+Format baris: `HH:MM:SS  [TAG] [KODE] pesan`. Tag: `[OK]` sukses · `[!!]` gagal · `[??]` peringatan · `[--]` info · `[>>]` skip.
+
+| Log                                                                  | Arti                         |
+| -------------------------------------------------------------------- | ---------------------------- |
+| `[OK] [LOGIN] Authenticated`                                         | login sukses                 |
+| `[!!] [LOGIN] GAGAL -- dilempar ke ...`                              | NIM/password salah           |
+| `[--] [SCAN] Scan awal: 1 siap \| 1 sudah \| 0 belum buka ...`       | ringkasan scan per warna     |
+| `[--] [ABSEN] target: NamaMatkul (jam)`                              | mulai proses absen           |
+| `[??] [RETRY] percobaan 1/5 masih biru, tekan lagi`                  | belum berhasil, diulang      |
+| `[OK] [ABSEN] BERHASIL (percobaan N): NamaMatkul`                    | **absen berhasil**           |
+| `[!!] [ABSEN] GAGAL setelah N percobaan: NamaMatkul. Kemungkinan...` | **absen gagal** + sebab      |
+| `[??] [SESSION] Sesi habis -- re-login...`                           | sesi berakhir, auto re-login |
+| `[!!] [ERROR] request gagal...`                                      | error jaringan/request       |
+
+Di `windows/` dan `termux/`, rincian per mata kuliah **sengaja tidak ditulis ke log** —
+semuanya sudah ada di tabel **Jadwal Hari Ini** lengkap dengan alasannya, jadi log hanya
+memuat kejadian penting. (Di mode plain text yang tidak punya tabel, daftar jadwal dicetak
+sekali tiap kali ada status yang berubah.) Versi `linux/` masih menulis baris
+`[>>] [SKIP] (warna) alasan -- Matkul` untuk tiap baris non-biru.
+
+Status tiap mata kuliah dibaca dari tabel **Jadwal Hari Ini**, bukan dari log.
+Hanya ada **empat** status, mengikuti warna tombol di halaman akademik:
+
+| Status | Warna tombol | Arti |
+|---|---|---|
+| `SUDAH ABSEN` | hijau | absensi sudah tercatat |
+| `SIAP ABSEN` | biru | bisa diabsen sekarang — akan diklik otomatis |
+| `BELUM BUKA` | kuning | dosen belum membuka sesi absen |
+| `BELUM WAKTUNYA` | merah | di luar jam absensi |
+
+Begitu sebuah baris berhasil diabsenkan, statusnya **langsung berubah jadi
+`SUDAH ABSEN`** — tidak ada status "BERHASIL" terpisah. Kalau percobaannya gagal,
+barisnya tetap `SIAP ABSEN` dan diulang (sebab gagalnya muncul di Log Aktivitas),
+sampai semua yang biru berubah hijau. Pada mode loop, pengulangan berikutnya
+menunggu interval berikutnya.
 
 ### Mode diagnostik `--dump` (engine)
 

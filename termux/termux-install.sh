@@ -24,7 +24,8 @@ if ! python -m pip --version >/dev/null 2>&1; then
   echo "    pip rusak — memperbaiki paket python-pip..."
   pkg install -y --reinstall python-pip || pkg install -y python-pip
 fi
-python -m pip install --user requests beautifulsoup4
+# rich = live TUI dashboard (tui.py). Kalau gagal, engine tetap jalan plain text.
+python -m pip install --user requests beautifulsoup4 rich
 
 echo "==> [3/4] Siapkan config di folder script: $SCRIPT_DIR"
 if [ ! -f "$SCRIPT_DIR/.env" ]; then

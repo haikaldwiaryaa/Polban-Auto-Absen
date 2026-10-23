@@ -1,6 +1,6 @@
 # Polban Auto Absen — Termux (Android)
 
-Jalankan auto-absen di HP Android **tanpa browser**, hemat baterai, bisa background 24/7.
+Jalankan auto-absen di HP Android **tanpa browser**, hemat baterai, bisa background 24/7 — dengan **live dashboard** yang sama seperti versi Linux (identitas, tabel jadwal, countdown, log aktivitas).
 
 ## Prasyarat
 
@@ -10,7 +10,7 @@ Jalankan auto-absen di HP Android **tanpa browser**, hemat baterai, bisa backgro
 
 ## Instalasi (lengkap, dari nol)
 
-1. **Salin file ke HP.** Kamu butuh `auto_absen.py`, `.env.example`, `termux-install.sh`, `termux-run.sh`. Cara termudah:
+1. **Salin file ke HP.** Kamu butuh `auto_absen.py`, `tui.py`, `.env.example`, `termux-install.sh`, `termux-run.sh`. Cara termudah:
 
    ```bash
    # Dari komputer/VPS yang punya filenya, kirim ke HP via scp/ssh,
@@ -21,7 +21,7 @@ Jalankan auto-absen di HP Android **tanpa browser**, hemat baterai, bisa backgro
 
    ```bash
    mkdir -p ~/polban-auto-absen && cd ~/polban-auto-absen
-   # letakkan auto_absen.py, .env.example, termux-install.sh, termux-run.sh di sini
+   # letakkan auto_absen.py, tui.py, .env.example, termux-install.sh, termux-run.sh di sini
    ```
 
 2. **Jalankan installer** (install python + dependensi + autostart):
@@ -52,7 +52,8 @@ Jalankan auto-absen di HP Android **tanpa browser**, hemat baterai, bisa backgro
    python auto_absen.py --engine http --once
    ```
 
-   Harus muncul `Login OK (terautentikasi, ...)` lalu hasil scan tombol.
+   Harus muncul banner, baris `[OK] [LOGIN] Authenticated`, lalu hasil scan tombol.
+   Mode `--once` otomatis plain text supaya log tetap terbaca setelah selesai.
 
 5. **Mode loop 24/7** (auto-restart bila error):
 
@@ -60,7 +61,9 @@ Jalankan auto-absen di HP Android **tanpa browser**, hemat baterai, bisa backgro
    bash termux-run.sh
    ```
 
-   Berhenti: `Ctrl+C`.
+   Berhenti: `Ctrl+C`. Layar penuh terasa sempit di HP? Jalankan dengan
+   `bash termux-run.sh --no-alt-screen` (dashboard tanpa alternate screen)
+   atau `bash termux-run.sh --plain` (log mengalir biasa).
 
 6. **(Opsional) Autostart saat HP nyala** — installer sudah membuat `~/.termux/boot/start-auto-absen.sh`. Cukup install **Termux:Boot**, lalu buka sekali. Selesai — setiap HP nyala, auto-absen jalan sendiri di background.
 
@@ -70,7 +73,24 @@ Engine **HTTP** (`requests`), bukan browser:
 
 - Login via `POST /laman/login`, verifikasi dengan GET `/ajar/absen`.
 - Alert "Kuesioner Layanan" **tidak pernah muncul** (itu JavaScript browser).
-- Parse tombol absen, klik yang **non-hijau**, polling tiap `POLBAN_INTERVAL` detik (default 60).
+- Parse tabel `#jadwal`, klik HANYA tombol **biru** lewat `POST /ajar/absen/absensi_awal`,
+  retry sampai terverifikasi (maks `POLBAN_MAX_RETRY`), polling tiap `POLBAN_INTERVAL` detik (default 60).
+
+## Tampilan
+
+Output ditangani `tui.py` (`rich`): banner, panel **Identitas**, tabel **Jadwal Hari Ini**
+(status per matkul: SUDAH ABSEN / SIAP ABSEN / BELUM BUKA / BELUM WAKTUNYA),
+countdown scan berikutnya, dan **Log Aktivitas** 15 baris terakhir.
+
+Otomatis jatuh ke plain text bila `rich` tidak terpasang, output dialihkan ke file
+(autostart/`absen.log`), atau dijalankan dengan `--once` / `--plain`.
+
+| Argumen | Keterangan |
+|---|---|
+| `--once` | sekali jalan lalu exit; dashboard tetap di layar (plain kalau output ke file) |
+| `--plain` | paksa plain text |
+| `--no-alt-screen` | dashboard tanpa alternate screen (layar HP sempit) |
+| `--dump [FILE]` | simpan HTML halaman absen (diagnostik) |
 
 ## Log
 
@@ -85,8 +105,10 @@ tail -f ~/polban-auto-absen/absen.log
 | Masalah                                               | Solusi                                                                                                                                                                  |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `command not found: python`                           | `pkg install -y python`                                                                                                                                                 |
-| `installing pip is forbidden / will break python-pip` | Jangan `pip install --upgrade pip`. Kalau sudah terlanjur: `pkg install -y --reinstall python-pip`, lalu `python -m pip install --user requests beautifulsoup4`         |
-| `No module named requests`                            | `python -m pip install --user requests beautifulsoup4`                                                                                                                  |
+| `installing pip is forbidden / will break python-pip` | Jangan `pip install --upgrade pip`. Kalau sudah terlanjur: `pkg install -y --reinstall python-pip`, lalu `python -m pip install --user requests beautifulsoup4 rich`         |
+| `No module named requests`                            | `python -m pip install --user requests beautifulsoup4 rich`                                                                                                             |
+| dashboard tidak muncul (log polos)                    | `rich` belum terpasang: `python -m pip install --user rich`                                                                                                             |
+| tampilan dashboard pecah di layar sempit              | jalankan `bash termux-run.sh --no-alt-screen` atau `--plain`                                                                                                            |
 | `ERROR: POLBAN_USERNAME...`                           | `.env` belum ada/kosong → ulangi langkah 3                                                                                                                              |
 | `[ERROR] .env tidak ditemukan`                        | Letakkan `.env` di **folder yang sama** dengan `termux-run.sh` (bukan di `~/polban-auto-absen`). Atau jalankan eksplisit: `POLBAN_ENV=/path/ke/.env bash termux-run.sh` |
 | `Login GAGAL`                                         | NIM/password salah di `.env`                                                                                                                                            |

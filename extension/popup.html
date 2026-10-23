@@ -4,37 +4,82 @@
 <meta charset="UTF-8">
 <title>Polban Auto Absen</title>
 <style>
-  body{font:14px/1.5 sans-serif;width:300px;padding:16px;background:#0d1117;color:#e6edf3;margin:0}
-  h1{font-size:15px;margin:0 0 4px;color:#58a6ff;text-align:center}
-  .sub{font-size:11px;color:#8b949e;text-align:center;margin-bottom:14px}
-  #start{width:100%;padding:12px;background:#238636;color:#fff;border:0;border-radius:8px;
-         font-size:15px;font-weight:700;cursor:pointer}
+  /* Palet disamakan dengan panel dashboard di content.js & TUI Linux. */
+  :root{
+    --bg:#0d1117; --card:#161b22; --line:#30363d; --fg:#e6edf3; --dim:#8b949e;
+    --blue:#58a6ff; --cyan:#39d0d8; --green:#3fb950; --yellow:#d29922; --red:#f85149;
+  }
+  *{box-sizing:border-box}
+  body{font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;width:316px;
+       padding:0;background:var(--bg);color:var(--fg);margin:0}
+  header{padding:12px 14px 10px;border-bottom:1px solid var(--line);background:var(--card)}
+  h1{font-size:12.5px;margin:0;letter-spacing:.9px;color:var(--blue);text-align:center;font-weight:700}
+  .sub{font-size:10px;color:var(--dim);text-align:center;margin-top:3px;letter-spacing:.4px}
+  main{padding:12px 14px 14px}
+  .card{border:1px solid var(--line);border-radius:8px;background:var(--card);margin-bottom:10px}
+  .card-t{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+          color:var(--dim);padding:5px 9px;border-bottom:1px solid var(--line)}
+  .card-b{padding:7px 9px}
+  dl{display:grid;grid-template-columns:52px 1fr;gap:2px 8px;margin:0}
+  dt{color:var(--dim)}
+  dd{margin:0;word-break:break-all}
+  #start{width:100%;padding:11px;background:#238636;color:#fff;border:1px solid #2ea043;
+         border-radius:8px;font:700 13px/1 ui-monospace,Consolas,monospace;cursor:pointer;
+         letter-spacing:.5px}
   #start:hover{background:#2ea043}
-  #start:disabled{background:#30363d;cursor:not-allowed}
-  .cred{margin-top:12px;font-size:11px;color:#8b949e;text-align:center}
-  .cred a{color:#58a6ff;cursor:pointer;text-decoration:underline}
-  .warn{margin-top:10px;padding:8px;background:#3d2f1f;border:1px solid #d29922;border-radius:6px;
-        font-size:11px;color:#d29922;display:none}
-  .flow{margin-top:12px;font-size:10px;color:#6e7681;text-align:center;line-height:1.6}
+  #start:disabled{background:#21262d;border-color:var(--line);color:var(--dim);cursor:not-allowed}
+  .warn{margin-top:10px;padding:7px 9px;background:rgba(210,153,34,.12);
+        border:1px solid var(--yellow);border-radius:6px;font-size:10.5px;color:var(--yellow);display:none}
+  .links{margin-top:10px;font-size:10.5px;color:var(--dim);text-align:center}
+  .links a{color:var(--blue);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--blue)}
+  .legend{margin-top:10px;font-size:10px;color:var(--dim);line-height:1.8}
+  .badge{display:inline-block;padding:0 5px;border-radius:999px;border:1px solid;font-size:9.5px;font-weight:700}
+  .b-blue{color:var(--cyan);border-color:#1f6feb;background:rgba(31,111,235,.12)}
+  .b-green{color:var(--green);border-color:#238636;background:rgba(35,134,54,.12)}
+  .b-orange{color:var(--yellow);border-color:#9e6a03;background:rgba(210,153,34,.12)}
+  .b-red{color:var(--red);border-color:#8c2320;background:rgba(248,81,73,.12)}
+  .flow{margin-top:10px;font-size:9.5px;color:#6e7681;text-align:center;line-height:1.7}
 </style>
 </head>
 <body>
-  <h1>🎓 Polban Auto Absen</h1>
-  <div class="sub">Login → bypass alert → /ajar/absen → klik semua tombol</div>
+  <header>
+    <h1>POLBAN AUTO ABSEN</h1>
+    <div class="sub">Extension v2.0 &middot; dashboard live di halaman absen</div>
+  </header>
 
-  <button id="start">▶ &nbsp;Mulai Absen</button>
+  <main>
+    <div class="card">
+      <div class="card-t">Identitas</div>
+      <div class="card-b">
+        <dl>
+          <dt>NIM</dt><dd id="nim">&mdash;</dd>
+          <dt>Target</dt><dd>/ajar/absen</dd>
+        </dl>
+      </div>
+    </div>
 
-  <div class="warn" id="warn">⚠️ NIM/password belum diisi. Klik "Pengaturan" dulu.</div>
+    <button id="start">&#9654;&nbsp; MULAI ABSEN</button>
 
-  <div class="cred">
-    NIM: <span id="nim">—</span> &nbsp;·&nbsp; <a id="open-options">⚙️ Pengaturan</a>
-  </div>
+    <div class="warn" id="warn">[??] NIM/password belum diisi. Buka Pengaturan dulu.</div>
 
-  <div class="flow">
-    Klik "Mulai Absen" → popup tertutup otomatis →<br>
-    tab akademik terbuka → login → ke halaman absen →<br>
-    klik semua tombol → log muncul di pojok kanan bawah situs.
-  </div>
+    <div class="links"><a id="open-options">&#9881; Pengaturan</a></div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-t">Arti warna tombol</div>
+      <div class="card-b legend">
+        <span class="badge b-blue">SIAP ABSEN</span> diklik otomatis<br>
+        <span class="badge b-green">SUDAH ABSEN</span> dilewati, dihitung berhasil<br>
+        <span class="badge b-orange">BELUM BUKA</span> dosen belum membuka sesi<br>
+        <span class="badge b-red">BELUM WAKTUNYA</span> di luar jam absensi
+      </div>
+    </div>
+
+    <div class="flow">
+      Mulai Absen &rarr; popup tertutup &rarr; tab akademik terbuka &rarr;<br>
+      login &rarr; ke halaman absen &rarr; klik tombol biru.<br>
+      Dashboard muncul di pojok kanan bawah situs.
+    </div>
+  </main>
 
 <script src="popup.js"></script>
 </body>

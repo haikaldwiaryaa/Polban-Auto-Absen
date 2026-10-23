@@ -7,8 +7,19 @@
 .clicked.json
 *.clicked.json
 absen-dump.html
-*.html
+*-dump.html
 *.log
+
+# Runtime portable yang diunduh installer (jangan pernah di-commit)
+windows/python/
+python-embed.zip
+get-pip.py
+
+# Catatan/konfigurasi asisten AI - lokal saja
+CLAUDE.md
+AGENT.md
+AGENTS.md
+.claude/
 
 # Python
 __pycache__/

@@ -4,51 +4,111 @@
 <meta charset="UTF-8">
 <title>Pengaturan Auto Absen</title>
 <style>
-  body{font:14px/1.5 sans-serif;width:340px;padding:16px;background:#f4f6f9;color:#222}
-  h1{font-size:16px;margin:0 0 12px;color:#3c8dbc}
-  label{display:block;margin-top:10px;font-weight:600;font-size:12px}
-  input[type=text],input[type=password],input[type=url],input[type=number]{width:100%;padding:7px;border:1px solid #c4ccd6;border-radius:5px;box-sizing:border-box}
+  /* Palet disamakan dengan popup, panel dashboard, dan TUI Linux. */
+  :root{
+    --bg:#0d1117; --card:#161b22; --line:#30363d; --fg:#e6edf3; --dim:#8b949e;
+    --blue:#58a6ff; --cyan:#39d0d8; --green:#3fb950; --yellow:#d29922; --red:#f85149;
+  }
+  *{box-sizing:border-box}
+  body{font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;width:400px;
+       margin:0;padding:0;background:var(--bg);color:var(--fg)}
+  header{padding:12px 16px 10px;border-bottom:1px solid var(--line);background:var(--card)}
+  h1{font-size:12.5px;margin:0;letter-spacing:.9px;color:var(--blue);text-align:center;font-weight:700}
+  .sub{font-size:10px;color:var(--dim);text-align:center;margin-top:3px}
+  main{padding:14px 16px 18px}
+  .card{border:1px solid var(--line);border-radius:8px;background:var(--card);margin-bottom:12px}
+  .card-t{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+          color:var(--dim);padding:5px 10px;border-bottom:1px solid var(--line)}
+  .card-b{padding:10px}
+  label{display:block;margin-top:9px;font-size:10.5px;color:var(--dim);letter-spacing:.3px}
+  label:first-child{margin-top:0}
+  input[type=text],input[type=password],input[type=url],input[type=number]{
+    width:100%;padding:6px 8px;margin-top:3px;background:#0d1117;color:var(--fg);
+    border:1px solid var(--line);border-radius:6px;
+    font:12px/1.4 ui-monospace,Consolas,monospace}
+  input:focus{outline:none;border-color:var(--blue)}
   .row{display:flex;gap:10px}
   .row>div{flex:1}
-  .chk{display:flex;align-items:center;gap:6px;margin-top:8px}
-  button{margin-top:14px;width:100%;padding:9px;background:#3c8dbc;color:#fff;border:0;border-radius:6px;font-weight:700;cursor:pointer}
-  button:hover{background:#33739e}
-  .note{margin-top:10px;font-size:11px;color:#777}
-  .saved{margin-top:8px;color:#1a9c6b;font-weight:700;display:none}
+  .chk{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11px}
+  .chk input{accent-color:#1f6feb}
+  button{margin-top:4px;width:100%;padding:9px;background:#238636;color:#fff;
+         border:1px solid #2ea043;border-radius:7px;cursor:pointer;letter-spacing:.5px;
+         font:700 12.5px/1 ui-monospace,Consolas,monospace}
+  button:hover{background:#2ea043}
+  .saved{margin-top:9px;padding:6px 9px;border:1px solid var(--green);border-radius:6px;
+         background:rgba(63,185,80,.12);color:var(--green);font-size:10.5px;
+         font-weight:700;display:none;text-align:center}
+  .note{font-size:10px;color:var(--dim);line-height:1.8}
+  .badge{display:inline-block;padding:0 5px;border-radius:999px;border:1px solid;font-size:9.5px;font-weight:700}
+  .b-blue{color:var(--cyan);border-color:#1f6feb;background:rgba(31,111,235,.12)}
+  .b-green{color:var(--green);border-color:#238636;background:rgba(35,134,54,.12)}
+  .b-orange{color:var(--yellow);border-color:#9e6a03;background:rgba(210,153,34,.12)}
+  .b-red{color:var(--red);border-color:#8c2320;background:rgba(248,81,73,.12)}
 </style>
 </head>
 <body>
-<h1>⚙️ Polban Auto Absen</h1>
+<header>
+  <h1>POLBAN AUTO ABSEN</h1>
+  <div class="sub">Pengaturan extension v2.0</div>
+</header>
 
-<label>NIM (username)</label>
-<input type="text" id="username" placeholder="25......">
+<main>
+  <div class="card">
+    <div class="card-t">Kredensial</div>
+    <div class="card-b">
+      <label>NIM (username)</label>
+      <input type="text" id="username" placeholder="25......">
 
-<label>Password</label>
-<input type="password" id="password" placeholder="********">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="********">
 
-<label>URL halaman absen</label>
-<input type="url" id="targetUrl" value="https://akademik.polban.ac.id/ajar/absen">
+      <label>URL halaman absen</label>
+      <input type="url" id="targetUrl" value="https://akademik.polban.ac.id/ajar/absen">
+    </div>
+  </div>
 
-<div class="chk"><input type="checkbox" id="autoLogin" checked><span>Auto-isi & submit form login</span></div>
-<div class="chk"><input type="checkbox" id="autoNav" checked><span>Auto-navigate ke halaman absen</span></div>
-<div class="chk"><input type="checkbox" id="autoClick" checked><span>Auto-klik tombol absen <b style="color:#3c8dbc">BIRU</b></span></div>
+  <div class="card">
+    <div class="card-t">Otomatisasi</div>
+    <div class="card-b">
+      <div class="chk"><input type="checkbox" id="autoLogin" checked><span>Auto-isi &amp; submit form login</span></div>
+      <div class="chk"><input type="checkbox" id="autoNav" checked><span>Auto-navigate ke halaman absen</span></div>
+      <div class="chk"><input type="checkbox" id="autoClick" checked><span>Auto-klik tombol <span class="badge b-blue">BIRU</span></span></div>
+    </div>
+  </div>
 
-<div class="row">
-  <div><label>Delay min (ms)</label><input type="number" id="delayMin" value="1200"></div>
-  <div><label>Delay max (ms)</label><input type="number" id="delayMax" value="2600"></div>
-</div>
-<div class="row">
-  <div><label>Poll (ms)</label><input type="number" id="pollMs" value="15000"></div>
-  <div><label>Max passes</label><input type="number" id="maxPasses" value="40"></div>
-</div>
-<div class="row">
-  <div><label>Max retry klik</label><input type="number" id="maxRetry" value="5"></div>
-  <div><label>Jeda retry (ms)</label><input type="number" id="retryWaitMs" value="2500"></div>
-</div>
+  <div class="card">
+    <div class="card-t">Timing</div>
+    <div class="card-b">
+      <div class="row">
+        <div><label>Delay min (ms)</label><input type="number" id="delayMin" value="1200"></div>
+        <div><label>Delay max (ms)</label><input type="number" id="delayMax" value="2600"></div>
+      </div>
+      <div class="row">
+        <div><label>Poll (ms)</label><input type="number" id="pollMs" value="15000"></div>
+        <div><label>Max passes</label><input type="number" id="maxPasses" value="40"></div>
+      </div>
+      <div class="row">
+        <div><label>Max retry klik</label><input type="number" id="maxRetry" value="5"></div>
+        <div><label>Jeda retry (ms)</label><input type="number" id="retryWaitMs" value="2500"></div>
+      </div>
+    </div>
+  </div>
 
-<button id="save">💾 Simpan</button>
-<div class="saved" id="saved">✅ Tersimpan. Reload tab akademik.</div>
-<div class="note">Biru=belum absen (diklik) · Hijau=sudah · Orange=dosen belum buka · Merah=bukan waktu. Kredensial disimpan lokal di browser (chrome.storage.sync), tidak dikirim kemana-mana.</div>
+  <button id="save">SIMPAN</button>
+  <div class="saved" id="saved">[OK] Tersimpan. Reload tab akademik.</div>
+
+  <div class="card" style="margin-top:12px">
+    <div class="card-t">Catatan</div>
+    <div class="card-b note">
+      <span class="badge b-blue">SIAP ABSEN</span> diklik &middot;
+      <span class="badge b-green">SUDAH ABSEN</span> dilewati<br>
+      <span class="badge b-orange">BELUM BUKA</span> dosen belum buka sesi &middot;
+      <span class="badge b-red">BELUM WAKTUNYA</span> di luar jam absensi<br>
+      Kredensial disimpan lokal di browser (chrome.storage.sync),
+      tidak dikirim ke mana pun selain akademik.polban.ac.id.
+    </div>
+  </div>
+</main>
 
 <script src="options.js"></script>
 </body>
