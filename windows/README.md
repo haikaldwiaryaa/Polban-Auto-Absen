@@ -6,7 +6,7 @@ Folder ini **mandiri** — engine `auto_absen.py` + modul UI `tui.py` ada di sin
 
 ## Tampilan
 
-Dashboard digambar di **alternate screen buffer** (seperti `htop`), jadi layar bersih dan tidak meninggalkan scrollback. Panel diperbarui *in-place*, bukan dicetak ulang tiap siklus, dan **ikut menyesuaikan saat jendela diubah ukurannya**: di bawah 96 kolom kolom Jam melipat ke bawah nama matkul, di bawah 62 kolom kolom Keterangan ikut melipat, dan jumlah baris log menyesuaikan tinggi jendela.
+Dashboard digambar di **alternate screen buffer** (seperti `htop`), jadi layar bersih dan tidak meninggalkan scrollback. Panel diperbarui *in-place*, bukan dicetak ulang tiap siklus, dan **ikut menyesuaikan saat jendela diubah ukurannya**: di bawah 96 kolom kolom Jam melipat ke bawah nama matkul, di bawah 62 kolom kolom Dosen ikut melipat, dan jumlah baris log menyesuaikan tinggi jendela.
 
 ```
 ┌──────────────────────── POLBAN AUTO ABSEN ─────────────────────────┐
@@ -22,8 +22,8 @@ Dashboard digambar di **alternate screen buffer** (seperti `htop`), jadi layar b
 │  │  Engine     : http  Interval : 60s  Next scan : 00:25       │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │  ┌─────────────────────── Jadwal Hari Ini ─────────────────────┐   │
-│  │  No │ Mata Kuliah     │ Jam        │ Status   │ Keterangan  │   │
-│  │   1 │ Komputer Grafik │ 08:40 s.d. │ BERHASIL │ terverifi.. │   │
+│  │  No │ Mata Kuliah     │ Jam        │ Status      │ Dosen     │   │
+│  │   1 │ Komputer Grafik │ 08:40 s.d. │ SUDAH ABSEN │ Trisna G. │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │  ┌──────────────────── Log Aktivitas (8 terakhir) ─────────────┐   │
 │  │  16:31:20  [OK] [LOGIN] Authenticated                       │   │

@@ -8,10 +8,10 @@ Panel di halaman absen kini berupa **dashboard** dengan susunan yang sama sepert
 |---|---|
 | Header | status dot + hitungan `OK / GAGAL / SKIP` + tombol scan, bersihkan log, minimize |
 | **Identitas** | Nama, NIM, Jurusan, Tanggal, Status login, Hasil scan, countdown `Next scan` |
-| **Jadwal Hari Ini** | tabel matkul + jam + badge status (SUDAH ABSEN / SIAP ABSEN / BELUM BUKA / BELUM WAKTUNYA) + alasan |
+| **Jadwal Hari Ini** | tabel matkul + jam + badge status (SUDAH ABSEN / SIAP ABSEN / BELUM BUKA / BELUM WAKTUNYA) + nama dosen pengampu |
 | **Log Aktivitas** | `HH:MM:SS [OK] [STAGE] pesan` — format identik dengan engine Python. Rincian per matkul tidak ditulis di sini karena sudah ada di tabel |
 
-Panel ikut ukuran jendela (`clamp(260px, 34vw, 430px)`), sudut kiri-bawahnya bisa ditarik untuk mengatur sendiri, dan di layar sempit (< 760px) panel melebar penuh dengan kolom Keterangan melipat ke bawah nama matkul.
+Panel ikut ukuran jendela (`min(430px, 100vw - 28px)`), dan di layar sempit (< 760px) panel melebar penuh dengan kolom Dosen melipat ke bawah nama matkul.
 
 Popup dan halaman Options memakai tema gelap yang sama.
 

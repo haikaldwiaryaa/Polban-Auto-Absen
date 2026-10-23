@@ -145,10 +145,10 @@
       #paa-jadwal col.c-mk{width:40%}
       #paa-jadwal col.c-st{width:24%}
       #paa-jadwal .mk{color:#e6edf3}
-      /* Alasan versi ringkas, hanya dipakai saat kolom Keterangan disembunyikan */
-      #paa-jadwal .ket-inline{display:none}
-      #paa-jadwal .jam{display:block;color:#8b949e;font-size:10px;margin-top:1px}
-      #paa-jadwal .ket{color:#8b949e}
+      /* Dosen versi ringkas, hanya dipakai saat kolom Dosen disembunyikan */
+      #paa-jadwal .dsn-inline{display:none}
+      #paa-jadwal .jam{display:block;color:#e6edf3;font-size:10.5px;margin-top:1px}
+      #paa-jadwal .dsn{color:#e6edf3}
       #paa-jadwal .empty{color:#8b949e;padding:8px 6px;text-align:center}
       .paa-badge{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;
         font-weight:700;white-space:nowrap;border:1px solid}
@@ -180,9 +180,9 @@
           max-height:min(70vh,560px)}
         #paa-jadwal col.c-mk{width:46%}
         #paa-jadwal col.c-st{width:30%}
-        #paa-jadwal .ket{display:none}        /* alasan pindah ke bawah nama */
+        #paa-jadwal .dsn{display:none}        /* dosen pindah ke bawah nama */
         #paa-jadwal th:last-child{display:none}
-        #paa-jadwal .ket-inline{display:block;color:#8b949e;font-size:10px;margin-top:2px}
+        #paa-jadwal .dsn-inline{display:block;color:#e6edf3;font-size:10.5px;margin-top:2px}
         .paa-kv{grid-template-columns:66px 1fr}
       }
       @media (max-height:620px){
@@ -306,15 +306,16 @@
     // kolom Keterangan tetap terbaca -- isinya sama dengan tabel TUI.
     let html = '<table><colgroup><col><col class="c-mk"><col class="c-st"><col></colgroup>' +
                '<thead><tr><th class="num">No</th>' +
-               '<th>Mata Kuliah</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>';
+               '<th>Mata Kuliah</th><th>Status</th><th>Dosen</th></tr></thead><tbody>';
     jadwalRows.forEach((r, i) => {
+      const dsn = r.dosen || '-';
       html += `<tr><td class="num">${i + 1}</td>` +
               `<td><span class="mk">${esc(r.nama)}</span>` +
               (r.jam ? `<span class="jam">${esc(r.jam)}</span>` : '') +
-              `<span class="ket-inline">${esc(r.detail)}</span></td>` +
+              `<span class="dsn-inline">${esc(dsn)}</span></td>` +
               `<td><span class="paa-badge st-${r.status}">` +
               `${STATUS_LABEL[r.status] || r.status.toUpperCase()}</span></td>` +
-              `<td class="ket">${esc(r.detail)}</td></tr>`;
+              `<td class="dsn">${esc(dsn)}</td></tr>`;
     });
     box.innerHTML = html + '</tbody></table>';
   }
@@ -452,17 +453,6 @@
   function findBySig(sig) { for (const b of attendanceButtons()) { if (signatureOf(b) === sig) return b; } return null; }
   function colorLabel(c) { return { blue: 'biru (siap absen)', green: 'hijau (sudah absen)', orange: 'kuning (belum buka)', red: 'merah (belum waktunya)', unknown: 'tidak dikenal' }[c] || c; }
 
-  // Alasan detail kenapa sebuah tombol di-skip, berdasarkan warnanya.
-  function skipReason(color) {
-    switch (color) {
-      case 'green':  return 'sudah absen (dihitung berhasil)';
-      case 'orange': return 'belum buka — dosen belum membuka sesi absen';
-      case 'red':    return 'belum waktunya — di luar jam absensi';
-      case 'unknown':return 'warna tidak dikenali — dilewati demi keamanan';
-      default:       return 'tidak perlu diklik';
-    }
-  }
-
   function realClick(el) {
     ['mousedown', 'mouseup', 'click'].forEach(t => el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window })));
     if (typeof el.click === 'function') el.click();
@@ -519,6 +509,18 @@
   // Ambil nama matkul / jam / dosen dari baris tabel jadwal.
   // Urutan sel sama dengan yang dipakai engine python:
   //   td1=dosen  td2=kode mk  td3=nama mk  td7=jam
+  // 'KO078N-Trisna Gelar Abdillah, S.T., M.Kom' -> 'Trisna Gelar Abdillah, S.T., M.Kom'.
+  // Hanya dipotong kalau bagian depan memang kode (pendek, tanpa spasi, ada angka).
+  function namaDosen(teks) {
+    const t = String(teks || '').replace(/\s+/g, ' ').trim();
+    const i = t.indexOf('-');
+    if (i > 0) {
+      const kode = t.slice(0, i).trim(), sisa = t.slice(i + 1).trim();
+      if (sisa && kode && !/\s/.test(kode) && kode.length <= 12 && /\d/.test(kode)) return sisa;
+    }
+    return t;
+  }
+
   function rowInfo(btn) {
     const row = btn.closest('tr');
     if (!row) return { nama: textOf(btn).replace(/\s+/g, ' ').trim(), jam: '', dosen: '' };
@@ -540,12 +542,10 @@
       // Berhasil diabsenkan -> ikut hijau (SUDAH ABSEN). Gagal -> tetap biru
       // supaya ikut dicoba lagi di polling berikutnya.
       const status = results[sig] === 'clicked' ? 'green' : color;
-      const detail = results[sig] === 'clicked' ? 'sudah absen (diabsenkan otomatis)'
-                   : results[sig] === 'failed' && color === 'blue'
-                     ? 'percobaan gagal -- akan diulang'
-                   : color === 'blue' ? 'siap absen -- akan diklik'
-                   : skipReason(color);
-      return { nama: info.nama.slice(0, 48), jam: info.jam, status, detail };
+      // Kolom terakhir diisi DOSEN, bukan alasan status: alasannya sudah
+      // terbaca dari badge Status, dan kejadian absennya ada di Log Aktivitas.
+      return { nama: info.nama.slice(0, 48), jam: info.jam, status,
+               dosen: namaDosen(info.dosen) };
     });
     renderJadwal();
   }

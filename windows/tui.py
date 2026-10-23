@@ -279,15 +279,14 @@ LEVEL_TAGS = {
 # ---------------------------------------------------------------
 class MataKuliah:
     """Satu baris matkul di tabel jadwal."""
-    __slots__ = ("nama", "jam", "dosen", "status", "detail")
+    __slots__ = ("nama", "jam", "dosen", "status")
 
     def __init__(self, nama: str, jam: str = "", dosen: str = "",
-                 status: str = "unknown", detail: str = ""):
+                 status: str = "unknown"):
         self.nama = nama
         self.jam = jam
-        self.dosen = dosen
+        self.dosen = nama_dosen(dosen)
         self.status = status
-        self.detail = detail
 
 
 class LogEntry:
@@ -299,6 +298,25 @@ class LogEntry:
         self.code = code
         self.message = message
         self.level = level
+
+
+def nama_dosen(teks: str) -> str:
+    """Buang kode dosen di depan: 'KO078N-Trisna Gelar Abdillah, S.T., M.Kom'
+    -> 'Trisna Gelar Abdillah, S.T., M.Kom'.
+
+    Hanya dipotong kalau bagian sebelum '-' memang berbentuk kode (pendek,
+    tanpa spasi), supaya nama yang mengandung tanda hubung tidak ikut terpotong.
+    """
+    t = " ".join(str(teks or "").split())
+    if "-" in t:
+        kode, sisa = t.split("-", 1)
+        kode, sisa = kode.strip(), sisa.strip()
+        # Kode dosen selalu memuat angka (KO078N, BD011N, ...) -- syarat ini
+        # mencegah nama bertanda hubung seperti "Ana-Maria" ikut terpotong.
+        if (sisa and kode and " " not in kode and len(kode) <= 12
+                and any(c.isdigit() for c in kode)):
+            return sisa
+    return t
 
 
 def _split_sig(sig: str):
@@ -423,10 +441,12 @@ class Dashboard:
 
             # Skips dulu (sudah absen / belum buka / dll.)
             for item in (skips or []):
-                color, sig, reason = item[0], item[1], item[2]
+                # `reason` ikut dibawa engine tapi tidak ditampilkan: alasannya
+                # sudah terbaca dari kolom Status.
+                color, sig = item[0], item[1]
                 nama, dosen, jam = _split_sig(sig)
                 jadwal.append(MataKuliah(nama=nama[:48], jam=jam, dosen=dosen,
-                                         status=color, detail=reason))
+                                         status=color))
 
             # Actions (biru / siap klik)
             for a in (actions or []):
@@ -436,7 +456,6 @@ class Dashboard:
                     jam=a.get("jam", "") or _split_sig(a.get("sig", ""))[2],
                     dosen=a.get("dosen", "") or _split_sig(a.get("sig", ""))[1],
                     status="blue",
-                    detail="siap absen -- akan diklik",
                 ))
 
             changed = False
@@ -446,7 +465,6 @@ class Dashboard:
                 # lama (server kadang telat memperbarui tombolnya).
                 if mk.nama in self._absen_sukses:
                     mk.status = "green"
-                    mk.detail = "sudah absen (diabsenkan otomatis)"
                 if mk.nama in old_states and old_states[mk.nama] != mk.status:
                     changed = True
             if len(old_states) != len(jadwal) and len(old_states) > 0:
@@ -476,12 +494,9 @@ class Dashboard:
                 self._stat_fail += 1
             for mk in self._jadwal:
                 if target and (target in mk.nama or mk.nama in target):
-                    if success:
-                        mk.status = "green"
-                        mk.detail = "sudah absen (diabsenkan otomatis)"
-                    else:
-                        mk.status = "blue"
-                        mk.detail = "percobaan gagal -- akan diulang"
+                    # Berhasil -> hijau. Gagal -> tetap biru supaya diulang;
+                    # sebab gagalnya dilaporkan lewat Log Aktivitas.
+                    mk.status = "green" if success else "blue"
                     break
         self._refresh()
 
@@ -547,7 +562,8 @@ class Dashboard:
             for mk in self._jadwal:
                 label = STATUS_LABELS.get(mk.status, mk.status.upper())
                 style = STATUS_STYLES.get(mk.status, "")
-                console.print(f"   - {mk.nama} {mk.jam}  [{style}]{label}[/{style}]")
+                console.print(f"   - {mk.nama} {mk.jam}  [{style}]{label}[/{style}]"
+                              + (f"  [dim]{mk.dosen}[/dim]" if mk.dosen else ""))
             console.print()
         except Exception:
             pass
@@ -666,6 +682,10 @@ class Dashboard:
     def _build_jadwal_panel(self) -> Panel:
         """Tabel jadwal matkul hari ini.
 
+        Isi tabel (matkul, jam, dosen) memakai warna teks normal -- BUKAN
+        'dim' -- supaya sama terbacanya; dim di terminal gelap jadi abu-abu
+        yang nyaris tenggelam ke latar.
+
         Tiga tingkat, menyesuaikan lebar jendela saat itu juga:
           >= 96 kolom : No | Mata Kuliah | Jam | Status | Keterangan
           >= 62 kolom : Jam pindah ke bawah nama matkul
@@ -682,12 +702,12 @@ class Dashboard:
         if not narrow:
             # 'HH:MM:SS s.d. HH:MM:SS' = 22 karakter: dikunci supaya tidak
             # dipatahkan jadi dua baris padahal ruangnya cukup.
-            table.add_column("Jam", width=22, style="dim")
+            table.add_column("Jam", width=22)
         # 'BELUM WAKTUNYA' = 14 karakter. Lebar DIKUNCI (bukan ratio) supaya
         # tidak pernah terpotong jadi 'SUDAH A...' di terminal sempit.
         table.add_column("Status", width=14, justify="center", no_wrap=True)
         if not tiny:
-            table.add_column("Keterangan", ratio=2, style="dim", min_width=12)
+            table.add_column("Dosen", ratio=3, min_width=14)
 
         n_col = 3 + (0 if narrow else 1) + (0 if tiny else 1)
 
@@ -704,15 +724,16 @@ class Dashboard:
                 if narrow:
                     nama = Text(mk.nama)
                     if mk.jam:
-                        nama.append(f"\n{mk.jam}", style="dim")
-                    if tiny and mk.detail:
-                        nama.append(f"\n{mk.detail}", style="dim")
+                        nama.append(f"\n{mk.jam}")
+                    if tiny and mk.dosen:
+                        nama.append(f"\n{mk.dosen}")
                     row = [str(i), nama, status]
                     if not tiny:
-                        row.append(mk.detail)
+                        row.append(mk.dosen or "-")
                     table.add_row(*row)
                 else:
-                    table.add_row(str(i), mk.nama, mk.jam, status, mk.detail)
+                    table.add_row(str(i), mk.nama, mk.jam, status,
+                                  mk.dosen or "-")
 
         return Panel(table, title="[bold]Jadwal Hari Ini[/bold]",
                      border_style="dim", box=self._box)
@@ -793,8 +814,8 @@ class PlainDashboard(Dashboard):
             for i, mk in enumerate(jadwal, 1):
                 label = STATUS_LABELS.get(mk.status, mk.status.upper())
                 jam = f"  {mk.jam}" if mk.jam else ""
-                detail = f"  ({mk.detail})" if mk.detail else ""
-                print(f"     {i}. {mk.nama}{jam}  -> {label}{detail}")
+                dosen = f"  [{mk.dosen}]" if mk.dosen else ""
+                print(f"     {i}. {mk.nama}{jam}  -> {label}{dosen}")
             print(flush=True)
         return changed
 

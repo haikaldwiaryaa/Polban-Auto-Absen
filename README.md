@@ -56,7 +56,7 @@ polban-auto-absen/
 - ✅ **Event-driven**, **anti-duplikat per-hari**, **kredensial tersimpan permanen**.
 - ✅ **Extension hanya jalan saat dipicu** — flow berjalan hanya setelah menekan **▶ Mulai Absen**.
 - ✅ **Dependensi menyusul sendiri** — `auto_absen.bat` dan `absen_sekali.bat` sama-sama memanggil `persiapan.bat` (Python portable + paket + `.env`), dan `termux-run.sh` melakukan pemeriksaan yang setara. Setelah `git pull` yang menambah dependensi, cukup jalankan seperti biasa. Untuk `linux/`, jalankan `bash install.sh` sekali setelah pull.
-- ✅ **Tampilan menyesuaikan ukuran jendela** (`windows/`, `termux/`, extension) — dashboard dibangun ulang tiap frame, jadi tabel jadwal berubah bentuk sendiri saat terminal di-maximize/di-restore: kolom Jam lalu Keterangan melipat ke bawah nama matkul, dan jumlah baris log menyesuaikan tinggi jendela. Di Windows, buffer console ikut dilebarkan otomatis saat jendela di-maximize supaya tidak menyisakan area kosong di kanan. Panel extension melar/menyusut mengikuti lebar browser.
+- ✅ **Tampilan menyesuaikan ukuran jendela** (`windows/`, `termux/`, extension) — dashboard dibangun ulang tiap frame, jadi tabel jadwal berubah bentuk sendiri saat terminal di-maximize/di-restore: kolom Jam lalu Dosen melipat ke bawah nama matkul, dan jumlah baris log menyesuaikan tinggi jendela. Di Windows, buffer console ikut dilebarkan otomatis saat jendela di-maximize supaya tidak menyisakan area kosong di kanan. Panel extension melar/menyusut mengikuti lebar browser.
 - ✅ **Dashboard seragam di semua platform** — identitas mahasiswa, tabel jadwal hari ini dengan status per matkul, countdown scan berikutnya, log aktivitas ringkas. Di terminal (Windows/Linux/Termux) lewat `tui.py`, di browser lewat panel `content.js`.
 
 ---
@@ -152,6 +152,9 @@ Hanya ada **empat** status, mengikuti warna tombol di halaman akademik:
 | `SIAP ABSEN` | biru | bisa diabsen sekarang — akan diklik otomatis |
 | `BELUM BUKA` | kuning | dosen belum membuka sesi absen |
 | `BELUM WAKTUNYA` | merah | di luar jam absensi |
+
+Kolom terakhir tabel berisi **nama dosen pengampu** (kode di depannya dibuang),
+bukan alasan status — alasannya sudah terbaca dari badge statusnya sendiri.
 
 Begitu sebuah baris berhasil diabsenkan, statusnya **langsung berubah jadi
 `SUDAH ABSEN`** — tidak ada status "BERHASIL" terpisah. Kalau percobaannya gagal,

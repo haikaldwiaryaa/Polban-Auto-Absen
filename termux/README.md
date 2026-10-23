@@ -79,7 +79,7 @@ Engine **HTTP** (`requests`), bukan browser:
 ## Tampilan
 
 Output ditangani `tui.py` (`rich`): banner, panel **Identitas**, tabel **Jadwal Hari Ini**
-(status per matkul: SUDAH ABSEN / SIAP ABSEN / BELUM BUKA / BELUM WAKTUNYA),
+(status per matkul: SUDAH ABSEN / SIAP ABSEN / BELUM BUKA / BELUM WAKTUNYA, plus dosen pengampu),
 countdown scan berikutnya, dan **Log Aktivitas** 15 baris terakhir.
 
 Otomatis jatuh ke plain text bila `rich` tidak terpasang, output dialihkan ke file
