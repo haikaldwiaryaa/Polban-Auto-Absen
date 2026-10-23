@@ -23,6 +23,13 @@ polban-auto-absen/
 │   ├── absen_sekali.bat     # tes sekali
 │   ├── .env.example  README.md
 │
+├── linux/              # Linux (live TUI dashboard)
+│   ├── auto_absen.py        # engine + TUI integration
+│   ├── tui.py               # modul TUI (rich live dashboard)
+│   ├── install.sh           # installer
+│   ├── run.sh               # launcher
+│   ├── .env.example  README.md
+│
 ├── termux/             # Android Termux (background 24/7)
 │   ├── auto_absen.py        # engine (mandiri)
 │   ├── termux-install.sh    # installer
@@ -32,7 +39,7 @@ polban-auto-absen/
 └── README.md  CONTRIBUTING.md  LICENSE  .gitignore
 ```
 
-> **Catatan:** `windows/auto_absen.py` dan `termux/auto_absen.py` adalah **salinan engine yang sama**. Kalau mengubah logika engine, ubah **keduanya** agar tetap sinkron (atau jadikan satu sumber lalu salin saat rilis).
+> **Catatan:** `windows/auto_absen.py` dan `termux/auto_absen.py` adalah **salinan engine yang sama**. `linux/auto_absen.py` berbagi engine logic yang sama tetapi output dialihkan ke live TUI dashboard via `tui.py`. Kalau mengubah logika engine, ubah **semua versi** agar tetap sinkron.
 
 ## Fitur
 
@@ -64,7 +71,19 @@ auto_absen.bat       :: jalankan (loop)
 absen_sekali.bat     :: tes sekali
 ```
 
-## 📱 Termux (Android)
+## Linux (Live TUI Dashboard)
+
+Lihat **`linux/README.md`** — panduan lengkap.
+
+```bash
+cd linux
+bash install.sh
+cp .env.example .env && nano .env
+python3 auto_absen.py --engine http --once   # tes
+bash run.sh                                  # loop (live dashboard)
+```
+
+## Termux (Android)
 
 Lihat **`termux/README.md`** — panduan lengkap dari nol.
 
